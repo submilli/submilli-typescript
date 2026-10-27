@@ -23,6 +23,7 @@
   "sideEffects": false,
   "exports": {
     ".": {
+      "submilli-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
@@ -41,7 +42,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --conditions=submilli-source --test --test-reporter=spec 'test/*.test.ts'",
     "test:integration": "node --conditions=submilli-source --test --test-reporter=spec --test-concurrency=1 'test/integration/*.test.ts'",
-    "check": "npm run build && publint"
+    "check": "npm run build && publint",
+    "example:check": "node --conditions=submilli-source examples/research/check.ts"
   },
   "dependencies": {
     "@submilli/sdk": "^0.1.0"
@@ -50,6 +52,7 @@
     "ai": "^7.0.0"
   },
   "devDependencies": {
+    "@ai-sdk/anthropic": "^4.0.89",
     "ai": "7.0.154",
     "zod": "^4.1.8"
   },

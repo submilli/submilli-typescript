@@ -515,9 +515,11 @@ class Agent {
   /**
    * Refuse the calls of runs this conversation left waiting on an approval.
    *
-   * A run that waits holds back later programs in its session, so before a
-   * new program runs, each run the conversation shows waiting is answered:
-   * refused, with the person's reason when they refused it.
+   * A run left waiting would hold its call until the Blueprint's
+   * `tool_call_timeout`, when the call throws `TimeoutError` and the program
+   * carries on where nobody sees it. So before a new program runs, each run
+   * the conversation shows waiting is answered: refused, with the person's
+   * reason when they refused it.
    */
   private async abandonWaiting(
     session: StoredSession,
