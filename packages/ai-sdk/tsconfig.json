@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // The AI SDK's types are not written for exactOptionalPropertyTypes.
+  "compilerOptions": { "noEmit": true, "isolatedDeclarations": false, "exactOptionalPropertyTypes": false },
+  "include": ["src", "test"]
+}
