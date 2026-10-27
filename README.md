@@ -87,12 +87,29 @@ against it.
 
 ## CI and releases
 
-CI type-checks, runs the unit tests on Node 22 and 24, runs the integration tests against the
-released submilli-server, and installs each packed package on its own.
+GitHub Actions is not enabled for this repository, so run CI locally before you push:
 
-Release a package by pushing a tag that matches its `package.json` version: `sdk-v0.1.0` or
-`ai-sdk-v0.1.0`. The release workflow publishes it to npm with provenance, through trusted
-publishing. Release `@submilli/sdk` before an `@submilli/ai-sdk` version that depends on it.
+```sh
+scripts/ci.sh
+```
+
+It does what `.github/workflows/ci.yml` would: a clean install, type checks, unit tests, the
+build and publint, the integration tests against the pinned submilli-server release
+(downloaded into `.submilli-bin/` on Linux x86_64, or taken from `$SUBMILLI_BIN`), and an
+install of each packed package on its own. Run it on Node 22 and on Node 24.
+
+To release a package, bump its `package.json` version and changelog, run `scripts/ci.sh`, then
+publish from a clean checkout of `main`:
+
+```sh
+npm run build
+npm publish --workspace packages/sdk --access public      # or packages/ai-sdk
+git tag sdk-v0.1.0 && git push origin sdk-v0.1.0             # or ai-sdk-v0.1.0
+```
+
+Release `@submilli/sdk` before an `@submilli/ai-sdk` version that depends on it. Once Actions
+is enabled, pushing the tag runs `.github/workflows/release.yml` instead, which publishes with
+npm provenance through trusted publishing.
 
 ## License
 
