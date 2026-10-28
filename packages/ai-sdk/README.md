@@ -206,9 +206,29 @@ execute tool returns `awaiting_approval`. The model then calls `submilli__typesc
 which needs approval, so the AI SDK ends the step with a `tool-approval-request` whose input
 lists the waiting calls. Your UI shows it as it shows any other approval. Send the person's
 `tool-approval-response` with the next request, and the program carries on with the call
-approved or refused; the resume tool returns the program's result. The run waits on the server
-up to the Blueprint's `tool_call_timeout` (10 minutes by default). If the conversation moves on
-without answering, the waiting calls are refused before the next program runs.
+approved or refused. On approval, the resume tool returns the program's result; on refusal, the
+model is told to read `submilli__typescript__last_run`, which shows how the program ended.
+
+The run waits on the server up to the Blueprint's `tool_call_timeout` (10 minutes by default).
+The AI SDK takes a `tool-approval-response` only at the end of the messages, and rejects a
+request that leaves the resume call without a result (`MissingToolResultsError`). So when the
+person moves on without deciding, put a refusal in the resume call's place before their next
+message:
+
+```ts
+{
+  role: "tool",
+  content: [{
+    type: "tool-result",
+    toolCallId: request.toolCall.toolCallId,
+    toolName: "submilli__typescript__resume",
+    output: { type: "execution-denied", reason: "The person moved on without deciding." },
+  }],
+}
+```
+
+The waiting calls are then refused, with that reason, before the next program runs. The same
+happens if the model runs another program instead of resuming.
 
 **In your code.** Pass `onApprovalRequired`, and approvals are decided while the program waits,
 with no model round trip:

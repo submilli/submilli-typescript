@@ -233,7 +233,7 @@ describe("the AI SDK integration against submilli-server", { skip }, () => {
         const awaiting = JSON.parse(JSON.stringify(prompt.prompt)).flatMap((message: any) =>
           message.role === "tool" ? message.content : [],
         ).at(-1).output.value.awaiting_approval;
-        assert.deepEqual(awaiting.resume_input.calls[0].args, { id: 2, amount: 40 });
+        assert.deepEqual(awaiting.resume_input.calls, [{ tool: "refund", args: { id: 2, amount: 40 } }]);
         return [call(RESUME, awaiting.resume_input)];
       },
     ]);
@@ -280,6 +280,8 @@ describe("the AI SDK integration against submilli-server", { skip }, () => {
       },
     ]);
     const results = second.model.toolResults() as Record<string, any>[];
+    // last_run, asked first, already shows the refused program, finished with the person's reason.
+    assert.match(String(results.at(-3)!.result), /refused: .*no refunds/);
     // The denial the AI SDK reports, then the next program, which ran.
     const note = results.at(-2)!;
     assert.match(String(note.result), /notes before/);
@@ -288,5 +290,48 @@ describe("the AI SDK integration against submilli-server", { skip }, () => {
     const refusedRun = await client.runs.retrieve(waiting);
     assert.ok(refusedRun.status === "finished");
     assert.match(String(refusedRun.result), /refused: .*no refunds/);
+  });
+
+  test("a person who moves on: a denied result in the resume call's place refuses the waiting call", async () => {
+    refunded.length = 0;
+    const options = {
+      store: memorySessionStore(),
+      conversationId: `moved_on_${Date.now()}`,
+      variables: { userId: "u" },
+      ptc: { lookup, refund },
+      toolApproval: { refund: "user-approval" as const },
+    };
+    let waiting = "";
+    const first = await run(options, [
+      [execute(REFUNDS)],
+      (prompt) => {
+        const awaiting = JSON.parse(JSON.stringify(prompt.prompt)).flatMap((message: any) =>
+          message.role === "tool" ? message.content : [],
+        ).at(-1).output.value.awaiting_approval;
+        waiting = awaiting.resume_input.execution_id;
+        return [call(RESUME, awaiting.resume_input)];
+      },
+    ]);
+    const approval = first.result.content.find((part) => part.type === "tool-approval-request")!;
+    const second = await run(options, [[execute(NOTE)], "done"], [
+      ...first.messages,
+      {
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            toolCallId: approval.toolCall.toolCallId,
+            toolName: RESUME,
+            output: { type: "execution-denied", reason: "went to lunch" },
+          },
+        ],
+      },
+      { role: "user", content: "something else" },
+    ]);
+    assert.match(String(shown(second.model).result), /notes before/);
+    assert.deepEqual(refunded, []);
+    const refusedRun = await client.runs.retrieve(waiting);
+    assert.ok(refusedRun.status === "finished");
+    assert.match(String(refusedRun.result), /refused: .*went to lunch/);
   });
 });

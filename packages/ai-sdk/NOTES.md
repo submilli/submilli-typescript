@@ -140,7 +140,10 @@ interrupt; this package offers the same two.
   can block on a push notification.
 - **Through the AI SDK's flow** (no callback): the gated call stops the drive loop. The run
   waits on the server, and the execute tool returns `awaiting_approval` with a `resume_input`
-  (`execution_id` and the waiting calls) and a note. The model calls
+  (`execution_id` and the waiting calls, each `tool` and `args`) and a note. The calls carry no
+  server call ids: a live gpt-6-luna run copied one back with a mangled UUID, which would have
+  made the person's approval `approval_stale`. Calls match by position, tool, and arguments,
+  which is what the person approves. The model calls
   `submilli__typescript__resume` with it. That tool has `needsApproval: true`, so the AI SDK
   puts it to the person, and its input shows them exactly which calls with which arguments.
   On approval, the resume tool checks the run still waits on those same calls (otherwise
@@ -155,6 +158,16 @@ interrupt; this package offers the same two.
   which carries on unobserved. So before the next execute, each run the conversation's
   messages show waiting is answered `denied`, with the person's reason when they gave one,
   and driven to its end. Other calls the program makes on the way are answered normally.
+  `last_run` first sends the refusals a person gave (not the unanswered calls: the model may
+  still be about to resume them), so after a refusal it shows how that program ended. Without
+  this, a live model that checked `last_run` after a refusal was shown an older run, and then
+  re-ran the whole task, asking again for a refund that had already gone through. The resume
+  tool's description tells the model to check `last_run` after a refusal.
+- **A person who moves on.** The AI SDK converts a `tool-approval-response` only when it ends
+  the messages; with a user message after it, the resume call has no result and the request
+  fails with `MissingToolResultsError`. So the application puts a `tool-result` with
+  `execution-denied` in the resume call's place, and reconciliation reads its reason as the
+  person's refusal.
   Measured on the real server: a waiting run does not block other programs in the session,
   so this is about a deterministic outcome, not liveness.
 - **Bypass protection.** If a generation-level `toolApproval` function approves the resume

@@ -43,8 +43,10 @@ export function applicationToolsPrompt(names: readonly string[], approvals: bool
 export const RESUME_DESCRIPTION: string =
   "Continue a program that waits on a person's approval of a call to one of the application's tools. " +
   `Call it with the \`resume_input\` that ${EXECUTE} or this tool returned in \`awaiting_approval\`, ` +
-  "exactly as given. The person approves or refuses the call; the program then carries on and this tool " +
-  "returns its result, as the execute tool would.";
+  "exactly as given. The person approves or refuses the call. When approved, the program carries on and " +
+  "this tool returns its result, as the execute tool would. When refused, the call throws " +
+  `\`PermissionDeniedError\` in the program, which carries on from there; call ${LAST_RUN} ` +
+  "to see how it ended before you run another program or tell the user what happened.";
 
 export const DENIAL_NOTE: string =
   "The operator's policy denied this. The denial is final: tell the user what was refused, " +
@@ -131,7 +133,7 @@ export interface ToolCallRecord {
 /** What `submilli__typescript__resume` takes: the waiting run and the calls a person is asked about. */
 export interface ResumeInput {
   execution_id: string;
-  calls: { call_id: string; tool: string; args: Record<string, unknown> }[];
+  calls: { tool: string; args: Record<string, unknown> }[];
 }
 
 /**
@@ -182,7 +184,7 @@ export function awaitingOutput(
 ): ExecuteOutput {
   const resumeInput: ResumeInput = {
     execution_id: executionId,
-    calls: calls.map((call) => ({ call_id: call.callId, tool: call.tool, args: call.args })),
+    calls: calls.map((call) => ({ tool: call.tool, args: call.args })),
   };
   const output: ExecuteOutput = {
     result: null,
@@ -252,7 +254,7 @@ export function idempotencyOutput(error: IdempotencyError, sessionId: string): E
 /** A resume whose calls no longer match what the run waits on. Nothing was answered. */
 export function staleResumeOutput(input: ResumeInput, sessionId: string, waiting: readonly PendingCall[]): ExecuteOutput {
   const now = waiting.length
-    ? `It now waits on: ${JSON.stringify(waiting.map((call) => ({ call_id: call.callId, tool: call.tool, args: call.args })))}.`
+    ? `It now waits on: ${JSON.stringify(waiting.map((call) => ({ tool: call.tool, args: call.args })))}.`
     : "It no longer waits on any call.";
   return {
     result: null,

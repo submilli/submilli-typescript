@@ -466,8 +466,8 @@ class Agent {
             type: "array",
             items: {
               type: "object",
-              properties: { call_id: { type: "string" }, tool: { type: "string" }, args: { type: "object" } },
-              required: ["call_id", "tool", "args"],
+              properties: { tool: { type: "string" }, args: { type: "object" } },
+              required: ["tool", "args"],
             },
           },
         },
@@ -525,8 +525,10 @@ class Agent {
     session: StoredSession,
     catalog: Catalog,
     options: ToolExecutionOptions<unknown>,
+    { refusedOnly = false } = {},
   ): Promise<void> {
     for (const { executionId, reason } of waitingRuns(options.messages)) {
+      if (refusedOnly && reason === undefined) continue;
       let state: RunState;
       try {
         state = await this.client.runs.retrieve(executionId, { signal: options.abortSignal });
@@ -562,6 +564,9 @@ class Agent {
   private async lastRun(options: ToolExecutionOptions<unknown>): Promise<JSONValue> {
     const session = await this.conversation.stored();
     if (!session) return "No program has run in this conversation yet.";
+    // A program whose call a person refused finishes only once the refusal is
+    // sent; send it now, so the last run is that program and not an older one.
+    if (this.resumable) await this.abandonWaiting(session, await this.catalog(this.current), options, { refusedOnly: true });
     const run = await this.client.sessions.lastRun(session.id, { signal: options.abortSignal });
     if (!run) {
       return (
@@ -743,7 +748,6 @@ function sameCalls(asked: m.ResumeInput["calls"], waiting: readonly PendingCall[
   return asked.every((call, index) => {
     const pending = waiting[index]!;
     return (
-      call.call_id === pending.callId &&
       call.tool === pending.tool &&
       JSON.stringify(sortKeys(call.args)) === JSON.stringify(sortKeys(pending.args))
     );
@@ -787,6 +791,10 @@ function waitingRuns(messages: readonly ModelMessage[]): { executionId: string; 
   // The resume calls the model made, by tool call id, and the run each names.
   const resumes = new Map<string, string>();
   const approvals = new Map<string, string>();
+  const refuse = (executionId: string | undefined, reason: string | undefined) => {
+    if (executionId === undefined || !waiting.has(executionId)) return;
+    waiting.set(executionId, reason ? `A person refused this call: ${reason}` : "A person refused this call.");
+  };
   for (const message of messages) {
     if (message.role === "assistant" && typeof message.content !== "string") {
       for (const part of message.content) {
@@ -805,11 +813,13 @@ function waitingRuns(messages: readonly ModelMessage[]): { executionId: string; 
         const executionId = awaiting?.resume_input?.execution_id;
         if (typeof executionId === "string") waiting.set(executionId, undefined);
       }
+      // What an application sends when the person moved on without deciding:
+      // the AI SDK takes approval responses only at the end of the messages.
+      if (part.type === "tool-result" && part.toolName === m.RESUME && part.output.type === "execution-denied") {
+        refuse(resumes.get(part.toolCallId), part.output.reason);
+      }
       if (part.type === "tool-approval-response" && !part.approved) {
-        const executionId = resumes.get(approvals.get(part.approvalId) ?? "");
-        if (executionId !== undefined && waiting.has(executionId)) {
-          waiting.set(executionId, part.reason ? `A person refused this call: ${part.reason}` : "A person refused this call.");
-        }
+        refuse(resumes.get(approvals.get(part.approvalId) ?? ""), part.reason);
       }
     }
   }
