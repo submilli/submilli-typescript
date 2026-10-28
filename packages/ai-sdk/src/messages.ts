@@ -139,9 +139,10 @@ export interface ResumeInput {
 /**
  * What the execute and resume tools return.
  *
- * The model is shown `result`, `console`, `error`, `denied` and the notes
- * (see `toModelOutput`). `execution_id`, `session_id` and `tool_calls` are
- * for the application: they link a step to the server's audit trail.
+ * The model is shown `result`, `console`, `error`, `denied`, the notes, and
+ * `tool_calls` without their ids (see `modelView`). `execution_id`,
+ * `session_id` and each call's `call_id` are for the application: they link a
+ * step to the server's audit trail.
  */
 export interface ExecuteOutput {
   result: string | null;
@@ -271,10 +272,16 @@ export function staleResumeOutput(input: ResumeInput, sessionId: string, waiting
   };
 }
 
-/** The part of an execute or resume output the model is shown. */
+/**
+ * The part of an execute or resume output the model is shown. It sees each
+ * call to the application's tools, so after a failure it knows which effects
+ * happened, but no ids: it has nothing to do with them, and copies them badly.
+ */
 export function modelView(output: ExecuteOutput): Record<string, unknown> {
-  const { execution_id: _execution, session_id: _session, tool_calls: _calls, ...shown } = output;
-  return JSON.parse(JSON.stringify(shown)) as Record<string, unknown>;
+  const { execution_id: _execution, session_id: _session, tool_calls: calls, ...shown } = output;
+  const view: Record<string, unknown> = { ...shown };
+  if (calls) view.tool_calls = calls.map(({ call_id: _id, ...call }) => call);
+  return JSON.parse(JSON.stringify(view)) as Record<string, unknown>;
 }
 
 function withExtra(

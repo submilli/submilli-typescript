@@ -237,6 +237,12 @@ describe("application tools", () => {
         ["lookup", { id: 2 }, "ok"],
       ],
     );
+    const [shown] = model.toolResults() as Record<string, unknown>[];
+    assert.deepEqual(shown?.tool_calls, [
+      { tool: "lookup", args: { id: 1 }, outcome: "ok" },
+      { tool: "lookup", args: { id: 2 }, outcome: "ok" },
+    ]);
+    assert.equal(shown?.execution_id, undefined);
   });
 
   test("a failing tool or bad input fails the program's call", async () => {

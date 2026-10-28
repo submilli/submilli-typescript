@@ -119,9 +119,10 @@ session, and `close()`, which ends it.
   stops without a result, such as one that is stuck or cancelled, comes back to the model as an
   error with the run's `status` and `reason`.
 - **Results.** The execute tool returns `result`, `console`, `error`, and `denied`. A denial
-  adds a `note` that tells the model the denial is final. The output also carries
-  `execution_id`, `session_id`, and `tool_calls` (each call to your tools, with its outcome),
-  which link the step to the server's audit trail. The model is not shown those three.
+  adds a `note` that tells the model the denial is final. `tool_calls` lists each call to your
+  tools with its arguments and outcome, so after a failure the model knows which effects
+  happened. The output also carries `execution_id`, `session_id`, and each call's `call_id`,
+  which link the step to the server's audit trail. The model is not shown those ids.
 - **Errors that are yours throw; errors that are the model's are results.** A wrong token, an
   unknown Blueprint, invalid variables, and an unreachable server throw. Program failures,
   denials, and idempotency refusals are tool results.

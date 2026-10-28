@@ -90,9 +90,13 @@ It is a port of the Python `submilli` SDK, with the same names in camelCase.
 
 - **The output carries ids; the model doesn't see them.** The execute tool returns `result`,
   `console`, `error`, `denied`, the notes, and `execution_id`, `session_id`, and `tool_calls`.
-  `toModelOutput` strips the last three, so the model sees what `langchain-submilli` shows it,
-  while `steps[].toolResults` keep the audit links for the application. LangChain has an
-  artifact for this; the AI SDK has `toModelOutput`.
+  `toModelOutput` strips the two ids and each call's `call_id`, while `steps[].toolResults`
+  keep the audit links for the application. LangChain has an artifact for this; the AI SDK
+  has `toModelOutput`.
+- **The model sees the program's calls to `ptc` tools** (tool, args, outcome, decision). In a
+  live run without them, a program refused partway through left the model unable to say which
+  refunds had gone through. The list shows nothing the program could not log itself, and the
+  Blueprint and approvals still decide each call before it runs.
 - Idempotency refusals, lost runs, and durable runs that stop without a result are results for
   the model, with text that says what is known about the effects, as in `langchain-submilli`.
 
