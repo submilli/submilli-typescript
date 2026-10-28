@@ -1,0 +1,24 @@
+{
+  "name": "submilli-typescript",
+  "private": true,
+  "description": "The Submilli TypeScript SDK and its harness integrations.",
+  "type": "module",
+  "workspaces": [
+    "packages/sdk",
+    "packages/ai-sdk"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test --workspaces",
+    "check": "npm run check --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "publint": "^0.3.25",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

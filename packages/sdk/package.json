@@ -1,0 +1,50 @@
+{
+  "name": "@submilli/sdk",
+  "version": "0.1.0",
+  "description": "The TypeScript SDK for submilli-server's HTTP API: sessions, runs, application tools, and typed errors.",
+  "keywords": [
+    "submilli",
+    "code-mode",
+    "agents",
+    "sandbox",
+    "llm"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/submilli/submilli-typescript/tree/main/packages/sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/submilli/submilli-typescript.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": "https://github.com/submilli/submilli-typescript/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "submilli-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --conditions=submilli-source --test --test-reporter=spec 'test/*.test.ts'",
+    "test:integration": "node --conditions=submilli-source --test --test-reporter=spec --test-concurrency=1 'test/integration/*.test.ts'",
+    "check": "npm run build && publint"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

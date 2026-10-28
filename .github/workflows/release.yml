@@ -1,0 +1,38 @@
+name: Release
+
+# Each package is released on its own tag: `sdk-v0.1.0` publishes @submilli/sdk,
+# `ai-sdk-v0.1.0` @submilli/ai-sdk. Publishing uses npm trusted publishing with
+# provenance: register this workflow and the `npm` environment for both packages
+# on npmjs.com first. Release @submilli/sdk before an @submilli/ai-sdk that
+# needs it.
+on:
+  push:
+    tags: ["sdk-v*", "ai-sdk-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+      - name: Read the package and version from the tag
+        id: tag
+        run: |
+          dir="${GITHUB_REF_NAME%-v*}"
+          version="${GITHUB_REF_NAME##*-v}"
+          test -d "packages/$dir"
+          test "$(node -p "require('./packages/$dir/package.json').version")" = "$version"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+      - run: npm run build
+      - run: npm test --workspace packages/${{ steps.tag.outputs.dir }}
+      - run: npm publish --workspace packages/${{ steps.tag.outputs.dir }} --provenance --access public

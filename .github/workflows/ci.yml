@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The submilli-server release the integration tests run against.
+  SUBMILLI_VERSION: "0.5.0"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build, and check what would be published
+        run: npm run check
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Download submilli-server ${{ env.SUBMILLI_VERSION }}
+        run: |
+          mkdir -p .submilli-bin && cd .submilli-bin
+          base=https://github.com/submilli/submilli-runtime/releases/download/v${SUBMILLI_VERSION}
+          curl -fsSLO "$base/submilli-server-x86_64-unknown-linux-musl"
+          curl -fsSLO "$base/SHA256SUMS"
+          grep ' submilli-server-x86_64-unknown-linux-musl$' SHA256SUMS | sha256sum -c
+          mv submilli-server-x86_64-unknown-linux-musl submilli-server
+          chmod +x submilli-server
+      - run: npm ci
+      - run: npm run test:integration --workspaces
+        env:
+          SUBMILLI_BIN: ${{ github.workspace }}/.submilli-bin
+
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: mkdir -p "$RUNNER_TEMP/packs" && npm pack --workspaces --pack-destination "$RUNNER_TEMP/packs"
+      - name: Each package installs and imports on its own, from its tarball
+        run: |
+          cd "$RUNNER_TEMP" && mkdir app && cd app && npm init -y >/dev/null
+          npm pkg set type=module
+          npm install ../packs/submilli-sdk-*.tgz ../packs/submilli-ai-sdk-*.tgz ai
+          node -e 'import("@submilli/sdk").then((m) => { if (!m.Submilli) process.exit(1) })'
+          node -e 'import("@submilli/ai-sdk").then((m) => { if (!m.submilliTools) process.exit(1) })'
+      - name: "@submilli/ai-sdk depends on @submilli/sdk from npm, not the workspace"
+        run: |
+          tar -xOzf "$RUNNER_TEMP"/packs/submilli-ai-sdk-*.tgz package/package.json \
+            | node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{const v=JSON.parse(s).dependencies["@submilli/sdk"];if(!/^\^\d/.test(v)){console.error(v);process.exit(1)}})'
