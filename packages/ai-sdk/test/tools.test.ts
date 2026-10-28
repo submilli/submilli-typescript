@@ -206,6 +206,7 @@ describe("application tools", () => {
     assert.ok(!model.toolNames().includes("lookup"), "ptc tools are not given to the model");
     assert.ok(!model.toolNames().includes(RESUME));
     assert.match(model.description(EXECUTE) ?? "", /@tools.*`lookup`/s);
+    assert.match(model.description(EXECUTE) ?? "", /`tools\.lookup\(\{ \.\.\. \}\)`/);
     const [session] = fake.sessions.values();
     assert.deepEqual(session?.tools, [
       {

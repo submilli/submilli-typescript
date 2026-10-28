@@ -35,7 +35,8 @@ export function applicationToolsPrompt(names: readonly string[], approvals: bool
     : "";
   return (
     "\n\nThis agent's programs can also call the application's own tools, as the `@tools` package " +
-    `(\`import tools from "@tools";\`): ${listed}. The application runs each call and returns its result to the ` +
+    `(\`import tools from "@tools";\`): ${listed}. Call each as a member with one argument object, ` +
+    `\`tools.${names[0]}({ ... })\`. The application runs each call and returns its result to the ` +
     `program.${approval} Read their signatures with \`${PACKAGES_DOCS}("@tools")\`.`
   );
 }
