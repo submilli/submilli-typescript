@@ -1,13 +1,13 @@
 name: Release
 
 # Each package is released on its own tag: `sdk-v0.1.0` publishes @submilli/sdk,
-# `ai-sdk-v0.1.0` @submilli/ai-sdk. Publishing uses npm trusted publishing with
-# provenance: register this workflow and the `npm` environment for both packages
-# on npmjs.com first. Release @submilli/sdk before an @submilli/ai-sdk that
-# needs it.
+# `ai-sdk-v0.1.0` @submilli/ai-sdk, `mastra-v0.1.0` @submilli/mastra. Publishing
+# uses npm trusted publishing with provenance: register this workflow and the
+# `npm` environment for each package on npmjs.com first. Release @submilli/sdk
+# before an integration that needs it.
 on:
   push:
-    tags: ["sdk-v*", "ai-sdk-v*"]
+    tags: ["sdk-v*", "ai-sdk-v*", "mastra-v*"]
 
 permissions:
   contents: read

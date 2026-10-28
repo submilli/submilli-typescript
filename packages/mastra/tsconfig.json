@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // Mastra's types are not written for exactOptionalPropertyTypes.
+  "compilerOptions": { "noEmit": true, "isolatedDeclarations": false, "exactOptionalPropertyTypes": false },
+  "include": ["src", "test", "examples"],
+  // A Submilli program, not Node code: the server checks it.
+  "exclude": ["examples/research/note.ts"]
+}

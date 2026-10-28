@@ -68,10 +68,13 @@ jobs:
         run: |
           cd "$RUNNER_TEMP" && mkdir app && cd app && npm init -y >/dev/null
           npm pkg set type=module
-          npm install ../packs/submilli-sdk-*.tgz ../packs/submilli-ai-sdk-*.tgz ai
+          npm install ../packs/submilli-sdk-*.tgz ../packs/submilli-ai-sdk-*.tgz ../packs/submilli-mastra-*.tgz ai @mastra/core
           node -e 'import("@submilli/sdk").then((m) => { if (!m.Submilli) process.exit(1) })'
           node -e 'import("@submilli/ai-sdk").then((m) => { if (!m.submilliTools) process.exit(1) })'
-      - name: "@submilli/ai-sdk depends on @submilli/sdk from npm, not the workspace"
+          node -e 'import("@submilli/mastra").then((m) => { if (!m.createSubmilliTools) process.exit(1) })'
+      - name: "The integrations depend on @submilli/sdk from npm, not the workspace"
         run: |
-          tar -xOzf "$RUNNER_TEMP"/packs/submilli-ai-sdk-*.tgz package/package.json \
-            | node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{const v=JSON.parse(s).dependencies["@submilli/sdk"];if(!/^\^\d/.test(v)){console.error(v);process.exit(1)}})'
+          for pack in "$RUNNER_TEMP"/packs/submilli-ai-sdk-*.tgz "$RUNNER_TEMP"/packs/submilli-mastra-*.tgz; do
+            tar -xOzf "$pack" package/package.json \
+              | node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{const v=JSON.parse(s).dependencies["@submilli/sdk"];if(!/^\^\d/.test(v)){console.error(v);process.exit(1)}})'
+          done

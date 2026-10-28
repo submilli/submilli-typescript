@@ -54,11 +54,15 @@ npm pack --workspaces --pack-destination "$scratch/packs" >/dev/null 2>&1
   cd "$scratch/app"
   npm init -y >/dev/null
   npm pkg set type=module
-  npm install --no-audit --no-fund ../packs/submilli-sdk-*.tgz ../packs/submilli-ai-sdk-*.tgz ai >/dev/null
+  npm install --no-audit --no-fund ../packs/submilli-sdk-*.tgz ../packs/submilli-ai-sdk-*.tgz \
+    ../packs/submilli-mastra-*.tgz ai @mastra/core >/dev/null
   node -e 'import("@submilli/sdk").then((m) => { if (!m.Submilli) process.exit(1) })'
   node -e 'import("@submilli/ai-sdk").then((m) => { if (!m.submilliTools) process.exit(1) })'
-  tar -xOzf ../packs/submilli-ai-sdk-*.tgz package/package.json |
-    node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{const v=JSON.parse(s).dependencies["@submilli/sdk"];if(!/^\^\d/.test(v)){console.error(`@submilli/sdk dependency is ${v}`);process.exit(1)}})'
+  node -e 'import("@submilli/mastra").then((m) => { if (!m.createSubmilliTools) process.exit(1) })'
+  for pack in ../packs/submilli-ai-sdk-*.tgz ../packs/submilli-mastra-*.tgz; do
+    tar -xOzf "$pack" package/package.json |
+      node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{const v=JSON.parse(s).dependencies["@submilli/sdk"];if(!/^\^\d/.test(v)){console.error(`@submilli/sdk dependency is ${v}`);process.exit(1)}})'
+  done
 )
 
 step "CI passed on Node $(node --version)"

@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "packages/sdk",
-    "packages/ai-sdk"
+    "packages/ai-sdk",
+    "packages/mastra"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
