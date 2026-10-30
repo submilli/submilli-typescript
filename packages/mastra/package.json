@@ -1,0 +1,65 @@
+{
+  "name": "@submilli/mastra",
+  "version": "0.1.0",
+  "description": "Submilli code mode for Mastra agents: the model writes TypeScript programs, and submilli-server runs them under a Blueprint's policy.",
+  "keywords": [
+    "submilli",
+    "mastra",
+    "code-mode",
+    "agents",
+    "sandbox",
+    "tools"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/submilli/submilli-typescript/tree/main/packages/mastra#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/submilli/submilli-typescript.git",
+    "directory": "packages/mastra"
+  },
+  "bugs": "https://github.com/submilli/submilli-typescript/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "submilli-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "NOTES.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --conditions=submilli-source --test --test-reporter=spec 'test/*.test.ts'",
+    "test:integration": "node --conditions=submilli-source --test --test-reporter=spec --test-concurrency=1 'test/integration/*.test.ts'",
+    "check": "npm run build && publint",
+    "example:check": "node --conditions=submilli-source examples/research/check.ts"
+  },
+  "dependencies": {
+    "@submilli/sdk": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@mastra/core": "^1.79.0"
+  },
+  "devDependencies": {
+    "@mastra/core": "1.79.0",
+    "@mastra/memory": "1.39.0",
+    "ai": "7.0.154",
+    "zod": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
