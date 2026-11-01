@@ -103,30 +103,28 @@ checks that package's example against it.
 
 ## CI and releases
 
-GitHub Actions is not enabled for this repository, so run CI locally before you push:
+CI (`.github/workflows/ci.yml`) runs on every pull request and on `main`: type checks, unit
+tests on Node 22 and 24, the build and publint, the integration tests against the pinned
+submilli-server release, and an install of each packed package on its own.
+`scripts/ci.sh` runs the same steps locally (it downloads that server release into
+`.submilli-bin/` on Linux x86_64, or takes it from `$SUBMILLI_BIN`).
+
+To release a package, bump its `package.json` version and changelog on `main`, then push a
+tag that matches the version:
 
 ```sh
-scripts/ci.sh
+git tag sdk-v0.1.0 && git push origin sdk-v0.1.0     # or ai-sdk-v0.1.0, mastra-v0.1.0
 ```
 
-It does what `.github/workflows/ci.yml` would: a clean install, type checks, unit tests, the
-build and publint, the integration tests against the pinned submilli-server release
-(downloaded into `.submilli-bin/` on Linux x86_64, or taken from `$SUBMILLI_BIN`), and an
-install of each packed package on its own. Run it on Node 22 and on Node 24.
+`.github/workflows/release.yml` checks that the tag matches the version, builds, tests the
+package, and publishes it to npm with provenance from the `npm` environment. Release
+`@submilli/sdk` before an `@submilli/ai-sdk` or `@submilli/mastra` version that depends on it.
 
-To release a package, bump its `package.json` version and changelog, run `scripts/ci.sh`, then
-publish from a clean checkout of `main`:
-
-```sh
-npm run build
-npm publish --workspace packages/sdk --access public      # or packages/ai-sdk, packages/mastra
-git tag sdk-v0.1.0 && git push origin sdk-v0.1.0             # or ai-sdk-v0.1.0, mastra-v0.1.0
-```
-
-Release `@submilli/sdk` before an `@submilli/ai-sdk` or `@submilli/mastra` version that depends
-on it. Once Actions
-is enabled, pushing the tag runs `.github/workflows/release.yml` instead, which publishes with
-npm provenance through trusted publishing.
+The workflow authenticates through npm trusted publishing: each package's settings on
+npmjs.com name this repository, `release.yml`, and the `npm` environment as its trusted
+publisher. npm offers that only for a package that already exists, so a package's first
+release uses an `NPM_TOKEN` secret in the `npm` environment instead. Remove the secret once
+every package has a trusted publisher.
 
 ## License
 
