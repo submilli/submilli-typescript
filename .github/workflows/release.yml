@@ -1,10 +1,15 @@
 name: Release
 
 # Each package is released on its own tag: `sdk-v0.1.0` publishes @submilli/sdk,
-# `ai-sdk-v0.1.0` @submilli/ai-sdk, `mastra-v0.1.0` @submilli/mastra. Publishing
-# uses npm trusted publishing with provenance: register this workflow and the
-# `npm` environment for each package on npmjs.com first. Release @submilli/sdk
-# before an integration that needs it.
+# `ai-sdk-v0.1.0` @submilli/ai-sdk, `mastra-v0.1.0` @submilli/mastra, with npm
+# provenance. Release @submilli/sdk before an integration that needs it.
+#
+# Publishing authenticates through npm trusted publishing: register this
+# workflow and the `npm` environment as each package's trusted publisher on
+# npmjs.com. npm only offers that for a package that already exists, so the
+# first release of a package uses an `NPM_TOKEN` secret in the `npm`
+# environment instead; npm tries trusted publishing first and falls back to the
+# token. Delete the secret once every package has a trusted publisher.
 on:
   push:
     tags: ["sdk-v*", "ai-sdk-v*", "mastra-v*"]
@@ -32,7 +37,11 @@ jobs:
           test -d "packages/$dir"
           test "$(node -p "require('./packages/$dir/package.json').version")" = "$version"
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@^11.5.1
       - run: npm ci
       - run: npm run build
       - run: npm test --workspace packages/${{ steps.tag.outputs.dir }}
       - run: npm publish --workspace packages/${{ steps.tag.outputs.dir }} --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
