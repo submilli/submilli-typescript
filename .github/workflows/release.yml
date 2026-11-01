@@ -4,12 +4,10 @@ name: Release
 # `ai-sdk-v0.1.0` @submilli/ai-sdk, `mastra-v0.1.0` @submilli/mastra, with npm
 # provenance. Release @submilli/sdk before an integration that needs it.
 #
-# Publishing authenticates through npm trusted publishing: register this
-# workflow and the `npm` environment as each package's trusted publisher on
-# npmjs.com. npm only offers that for a package that already exists, so the
-# first release of a package uses an `NPM_TOKEN` secret in the `npm`
-# environment instead; npm tries trusted publishing first and falls back to the
-# token. Delete the secret once every package has a trusted publisher.
+# Publishing authenticates through npm trusted publishing (OIDC): each package's
+# settings on npmjs.com name this workflow and the `npm` environment as its
+# trusted publisher, so no npm token is stored here. The environment only lets
+# release tags (`*-v*`) deploy.
 on:
   push:
     tags: ["sdk-v*", "ai-sdk-v*", "mastra-v*"]
@@ -43,5 +41,3 @@ jobs:
       - run: npm run build
       - run: npm test --workspace packages/${{ steps.tag.outputs.dir }}
       - run: npm publish --workspace packages/${{ steps.tag.outputs.dir }} --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

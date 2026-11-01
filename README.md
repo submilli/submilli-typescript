@@ -122,9 +122,9 @@ package, and publishes it to npm with provenance from the `npm` environment. Rel
 
 The workflow authenticates through npm trusted publishing: each package's settings on
 npmjs.com name this repository, `release.yml`, and the `npm` environment as its trusted
-publisher. npm offers that only for a package that already exists, so a package's first
-release uses an `NPM_TOKEN` secret in the `npm` environment instead. Remove the secret once
-every package has a trusted publisher.
+publisher, so no npm token is stored in GitHub. The `npm` environment accepts only release
+tags (`*-v*`). A new package needs one first release by a maintainer before a trusted
+publisher can be added to it.
 
 ## License
 

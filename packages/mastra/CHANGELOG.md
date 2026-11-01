@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-11-01
+
+Published from GitHub Actions through npm trusted publishing. No code changes.
+
 ## [0.1.0] - 2026-11-01
 
 First release, for submilli-server 0.4.1, `@mastra/core` 1.79, and `@submilli/sdk` 0.1.

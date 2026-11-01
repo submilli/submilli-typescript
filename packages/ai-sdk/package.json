@@ -1,6 +1,6 @@
 {
   "name": "@submilli/ai-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Submilli code mode for the Vercel AI SDK: the model writes TypeScript programs, and submilli-server runs them under a Blueprint's policy.",
   "keywords": [
     "submilli",
