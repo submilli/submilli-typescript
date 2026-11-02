@@ -282,7 +282,7 @@ describe("application tools", () => {
       "done",
     ]);
     assert.match(String(model.toolResults()[0]), /function lookup/);
-    assert.equal(fake.calls("POST", /^\/v1\/sessions\/[^/]+\/packages\/docs$/).length, 1);
+    assert.equal(fake.calls("GET", /^\/v1\/sessions\/[^/]+\/packages\/docs$/).length, 1);
   });
 
   test("tools routed by experimental_toolCallers become @tools", async () => {

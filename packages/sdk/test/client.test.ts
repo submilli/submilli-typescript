@@ -160,7 +160,11 @@ describe("discovery", () => {
     const entries = await client.blueprints.packageDocsBatch("research", ["@submilli/jina", "@missing", "@submilli/jina"]);
     assert.deepEqual(entries.map(e => [e.name, e.found]), [["@submilli/jina", true], ["@missing", false], ["@submilli/jina", true]]);
     assert.equal(entries[0]?.text, before.text);
-    assert.equal(server.calls("POST", /packages\/docs$/).length, 1);
+    const batchRequest = server.calls("GET", /packages\/docs$/).find(r => r.query.has("names[]"));
+    assert.deepEqual(batchRequest?.query.getAll("names[]"), ["@submilli/jina", "@missing", "@submilli/jina"]);
+    assert.equal(batchRequest?.body, undefined);
+    const special = "@scope/a+b & c/δ";
+    assert.equal((await client.blueprints.packageDocsBatch("research", [special]))[0]?.name, special);
     assert.deepEqual(await client.blueprints.packageDocsBatch("research", []), []);
     await assert.rejects(client.blueprints.packageDocsBatch("missing", []), UnknownBlueprintError);
     const session = await client.sessions.create("research", { variables: { userId: "u" }, tools: [{ name: "lookup", input_schema: { type: "object" } }] });

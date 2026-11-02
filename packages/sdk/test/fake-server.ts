@@ -102,14 +102,16 @@ export class FakeServer {
   private async handle(method: string, url: URL, headers: Headers, body: Json): Promise<Response> {
     const path = url.pathname;
     let match: RegExpExecArray | null;
-    if (method === "POST" && /^\/v1\/(sessions|blueprints)\/[^/]+\/packages\/docs$/.test(path)) {
+    if (method === "GET" && !url.searchParams.has("name") && /^\/v1\/(sessions|blueprints)\/[^/]+\/packages\/docs$/.test(path)) {
       const check = new URL(url);
+      check.search = "";
       check.searchParams.set("name", "@submilli/jina");
       const exists = await this.handle("GET", check, headers, {});
       if (exists.status !== 200) return exists;
       const results = [];
-      for (const name of body.names as string[]) {
+      for (const name of url.searchParams.getAll("names[]")) {
         const single = new URL(url);
+        single.search = "";
         single.searchParams.set("name", name);
         const response = await this.handle("GET", single, headers, {});
         results.push({ name, found: response.status === 200, text: await response.text() });

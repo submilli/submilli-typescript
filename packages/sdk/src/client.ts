@@ -349,9 +349,9 @@ export class Sessions {
   /** Read several packages in one request. Requires server batch-docs support. */
   async packageDocsBatch(sessionId: string, names: readonly string[], options: RequestOptions = {}): Promise<PackageDocsEntry[]> {
     return packageDocsBatch(await this.client.send({
-      method: "POST",
+      method: "GET",
       path: `/v1/sessions/${seg(sessionId)}/packages/docs`,
-      body: { names },
+      query: names.map((name): [string, string] => ["names[]", name]),
       retryable: true,
       signal: options.signal,
     }));
@@ -497,9 +497,9 @@ export class Blueprints {
   /** Read several packages in one request. Requires server batch-docs support. */
   async packageDocsBatch(blueprint: string, names: readonly string[], options: RequestOptions = {}): Promise<PackageDocsEntry[]> {
     return packageDocsBatch(await this.client.send({
-      method: "POST",
+      method: "GET",
       path: `/v1/blueprints/${seg(blueprint)}/packages/docs`,
-      body: { names },
+      query: names.map((name): [string, string] => ["names[]", name]),
       retryable: true,
       signal: options.signal,
     }));
