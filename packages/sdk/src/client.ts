@@ -22,6 +22,7 @@ import {
   type ExecuteResult,
   type LastRun,
   type PackageDocs,
+  type PackageDocsEntry,
   type PendingCall,
   type RunState,
   type ToolDeclaration,
@@ -344,6 +345,17 @@ export class Sessions {
       }),
     );
   }
+
+  /** Read several packages in one request. Requires server batch-docs support. */
+  async packageDocsBatch(sessionId: string, names: readonly string[], options: RequestOptions = {}): Promise<PackageDocsEntry[]> {
+    return packageDocsBatch(await this.client.send({
+      method: "GET",
+      path: `/v1/sessions/${seg(sessionId)}/packages/docs`,
+      query: names.map((name): [string, string] => ["names[]", name]),
+      retryable: true,
+      signal: options.signal,
+    }));
+  }
 }
 
 /** Runs that wait on the application's tools. */
@@ -482,6 +494,17 @@ export class Blueprints {
     return packageDocs(await this.get(`${seg(blueprint)}/packages/docs`, [["name", name]], options));
   }
 
+  /** Read several packages in one request. Requires server batch-docs support. */
+  async packageDocsBatch(blueprint: string, names: readonly string[], options: RequestOptions = {}): Promise<PackageDocsEntry[]> {
+    return packageDocsBatch(await this.client.send({
+      method: "GET",
+      path: `/v1/blueprints/${seg(blueprint)}/packages/docs`,
+      query: names.map((name): [string, string] => ["names[]", name]),
+      retryable: true,
+      signal: options.signal,
+    }));
+  }
+
   /** `GET /v1/blueprints/{name}/builtins`: the built-ins in scope without an import. */
   async builtins(blueprint: string, options: RequestOptions = {}): Promise<Record<string, unknown>> {
     return object(await this.get(`${seg(blueprint)}/builtins`, [], options));
@@ -568,5 +591,17 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
       reject(signal?.reason);
     };
     signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function packageDocsBatch(response: Response): PackageDocsEntry[] {
+  const body = object(response);
+  if (!Array.isArray(body.results)) throw new SubmilliError("expected docs results array");
+  return body.results.map((entry: unknown) => {
+    if (typeof entry !== "object" || entry === null || !("name" in entry) || !("found" in entry) || !("text" in entry)
+      || typeof entry.name !== "string" || typeof entry.found !== "boolean" || typeof entry.text !== "string") {
+      throw new SubmilliError("invalid batch docs entry");
+    }
+    return { name: entry.name, found: entry.found, text: entry.text };
   });
 }

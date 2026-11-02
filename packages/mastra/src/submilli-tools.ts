@@ -112,7 +112,7 @@ export type SubmilliToolSet = {
   submilli__typescript__execute: Tool<{ code: string }, m.ExecuteOutput | undefined, m.ApprovalPayload, m.ApprovalAnswer>;
   submilli__typescript__last_run: Tool<Record<string, never>, unknown>;
   submilli__typescript__packages__search: Tool<{ query?: string }, unknown>;
-  submilli__typescript__packages__docs: Tool<{ name: string }, string>;
+  submilli__typescript__packages__docs: Tool<{ names: string[] }, string>;
   submilli__typescript__builtins__list: Tool<Record<string, never>, unknown>;
   submilli__typescript__builtins__docs: Tool<{ names: string[] }, unknown>;
 };
@@ -336,12 +336,12 @@ class Agent {
         description: described[m.PACKAGES_DOCS]!,
         inputSchema: {
           type: "object",
-          properties: { name: { type: "string", description: "Package name, e.g. `submilli:crypto`." } },
-          required: ["name"],
+          properties: { names: { type: "array", items: { type: "string" }, description: "Package names to read before writing a program." } },
+          required: ["names"],
           additionalProperties: false,
         } as JSONSchema,
         execute: async (input, context) =>
-          this.packageDocs((input as { name: string }).name, context as unknown as MastraContext),
+          this.packageDocs((input as { names: string[] }).names, context as unknown as MastraContext),
       }) as unknown as SubmilliToolSet[typeof m.PACKAGES_DOCS],
       [m.BUILTINS_LIST]: createTool({
         id: m.BUILTINS_LIST,
@@ -613,12 +613,12 @@ class Agent {
     return this.inSession(context, (id) => this.client.sessions.searchPackages(id, query, signal));
   }
 
-  private async packageDocs(name: string, context: MastraContext): Promise<string> {
+  private async packageDocs(names: string[], context: MastraContext): Promise<string> {
     const signal = { signal: context.abortSignal };
     if (Object.keys(this.ptc).length === 0) {
-      return (await this.client.blueprints.packageDocs(this.options.blueprint, name, signal)).text;
+      return JSON.stringify({ results: await this.client.blueprints.packageDocsBatch(this.options.blueprint, names, signal) });
     }
-    return (await this.inSession(context, (id) => this.client.sessions.packageDocs(id, name, signal))).text;
+    return JSON.stringify({ results: await this.inSession(context, (id) => this.client.sessions.packageDocsBatch(id, names, signal)) });
   }
 
   private async inSession<T>(context: MastraContext, fetch: (sessionId: string) => Promise<T>): Promise<T> {

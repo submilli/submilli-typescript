@@ -154,6 +154,24 @@ describe("discovery", () => {
     assert.match(tools.text, /function lookup/);
   });
 
+  test("batch docs preserve order, missing entries, and single-name calls", async () => {
+    const { client, fake: server } = setup();
+    const before = await client.blueprints.packageDocs("research", "@submilli/jina");
+    const entries = await client.blueprints.packageDocsBatch("research", ["@submilli/jina", "@missing", "@submilli/jina"]);
+    assert.deepEqual(entries.map(e => [e.name, e.found]), [["@submilli/jina", true], ["@missing", false], ["@submilli/jina", true]]);
+    assert.equal(entries[0]?.text, before.text);
+    const batchRequest = server.calls("GET", /packages\/docs$/).find(r => r.query.has("names[]"));
+    assert.deepEqual(batchRequest?.query.getAll("names[]"), ["@submilli/jina", "@missing", "@submilli/jina"]);
+    assert.equal(batchRequest?.body, undefined);
+    const special = "@scope/a+b & c/δ";
+    assert.equal((await client.blueprints.packageDocsBatch("research", [special]))[0]?.name, special);
+    assert.deepEqual(await client.blueprints.packageDocsBatch("research", []), []);
+    await assert.rejects(client.blueprints.packageDocsBatch("missing", []), UnknownBlueprintError);
+    const session = await client.sessions.create("research", { variables: { userId: "u" }, tools: [{ name: "lookup", input_schema: { type: "object" } }] });
+    const own = await client.sessions.packageDocsBatch(session.id, ["@tools"]);
+    assert.match(own[0]!.text, /function lookup/);
+  });
+
   test("a one-off execute reports an unknown Blueprint as the result's error", async () => {
     const { client } = setup();
     const result = await client.execute("nope", "x", { variables: { userId: "u" } });
