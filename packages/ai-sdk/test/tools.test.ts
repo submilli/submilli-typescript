@@ -93,7 +93,7 @@ describe("tools", () => {
     const { model } = await run({ client, blueprint: "research", variables: { userId: "u" } }, [
       [
         call("submilli__typescript__packages__search", { query: "jina" }),
-        call("submilli__typescript__packages__docs", { name: "@submilli/jina" }),
+        call("submilli__typescript__packages__docs", { names: ["@submilli/jina"] }),
         call("submilli__typescript__builtins__list", {}),
         call("submilli__typescript__builtins__docs", { names: ["Map"] }),
         call("submilli__typescript__last_run", {}),
@@ -206,6 +206,7 @@ describe("application tools", () => {
     assert.ok(!model.toolNames().includes("lookup"), "ptc tools are not given to the model");
     assert.ok(!model.toolNames().includes(RESUME));
     assert.match(model.description(EXECUTE) ?? "", /@tools.*`lookup`/s);
+    assert.ok(model.description(EXECUTE)?.includes('packages__docs({"names":["@tools"]})'));
     assert.match(model.description(EXECUTE) ?? "", /`tools\.lookup\(\{ \.\.\. \}\)`/);
     const [session] = fake.sessions.values();
     assert.deepEqual(session?.tools, [
@@ -277,11 +278,11 @@ describe("application tools", () => {
   test("with ptc, discovery goes through the session and includes @tools", async () => {
     const { fake, client } = setup();
     const { model } = await run({ client, blueprint: "research", variables: { userId: "u" }, ptc: { lookup } }, [
-      [call("submilli__typescript__packages__docs", { name: "@tools" })],
+      [call("submilli__typescript__packages__docs", { names: ["@tools"] })],
       "done",
     ]);
     assert.match(String(model.toolResults()[0]), /function lookup/);
-    assert.equal(fake.calls("GET", /^\/v1\/sessions\/[^/]+\/packages\/docs$/).length, 1);
+    assert.equal(fake.calls("POST", /^\/v1\/sessions\/[^/]+\/packages\/docs$/).length, 1);
   });
 
   test("tools routed by experimental_toolCallers become @tools", async () => {

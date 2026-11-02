@@ -111,6 +111,15 @@ describe("against submilli-server", { skip }, () => {
     );
     const docs = await client.sessions.packageDocs(session.id, "@tools");
     assert.ok(docs.found);
+    const batch = await client.sessions.packageDocsBatch(session.id, ["@tools", "not-a-package", "@tools"]);
+    assert.deepEqual(batch.map(({ name, found }) => ({ name, found })), [
+      { name: "@tools", found: true }, { name: "not-a-package", found: false }, { name: "@tools", found: true },
+    ]);
+    assert.equal(batch[0]!.text, docs.text);
+    assert.deepEqual(batch[0], batch[2]);
+    const blueprintDocs = await client.blueprints.packageDocsBatch("shop", ["Map", "not-a-package"]);
+    assert.deepEqual(blueprintDocs.map((entry) => entry.found), [true, false]);
+
     assert.match(docs.text, /query_orders\(args: \{ customer: string \}\): \{ count: number \}/);
   });
 

@@ -44,7 +44,7 @@ import fs from "submilli:fs";
 
 function main(): string {
     const before: string[] = [];
-    for (const entry of fs.list(".", false)) before.push(entry.name);
+    for (const entry of fs.list(".")) before.push(entry.name);
     fs.writeText("check.md", "# Written by a check\\n");
     return \`notes before: \${before.join(", ") || "none"}\`;
 }
@@ -182,7 +182,7 @@ describe("the Mastra integration against submilli-server", { skip }, () => {
 
   test("a program calls the application's tools, typed by their schemas", async () => {
     const { model, agent: shop } = agent({ ptc: { lookup } }, [
-      [call("submilli__typescript__packages__docs", { name: "@tools" })],
+      [call("submilli__typescript__packages__docs", { names: ["@tools"] })],
       [execute(LOOKUP)],
       "done",
     ]);

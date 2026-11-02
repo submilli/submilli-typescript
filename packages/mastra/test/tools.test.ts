@@ -114,7 +114,7 @@ describe("tools", () => {
     const { fake, model, agent } = app({}, [
       [
         call("submilli__typescript__packages__search", { query: "jina" }),
-        call("submilli__typescript__packages__docs", { name: "@submilli/jina" }),
+        call("submilli__typescript__packages__docs", { names: ["@submilli/jina"] }),
         call("submilli__typescript__builtins__list", {}),
         call("submilli__typescript__builtins__docs", { names: ["Map"] }),
       ],
@@ -255,6 +255,7 @@ describe("ptc", () => {
     ]);
     assert.equal(context, "u_ada");
     assert.match(model.description(EXECUTE) ?? "", /`@tools`[^]*`lookup`, `whoami`/);
+    assert.ok(model.description(EXECUTE)?.includes('packages__docs({"names":["@tools"]})'));
     assert.deepEqual(shown(model), {
       result: JSON.stringify([{ id: 1, status: "shipped" }, { user: "u_ada" }]),
       console: [],
@@ -317,7 +318,7 @@ describe("ptc", () => {
 
   test("with ptc, discovery goes through the session and includes @tools", async () => {
     const { fake, model, agent } = app({ ptc: { lookup } }, [
-      [call("submilli__typescript__packages__docs", { name: "@tools" })],
+      [call("submilli__typescript__packages__docs", { names: ["@tools"] })],
       "done",
     ]);
     await agent.generate("go", { memory: THREAD });

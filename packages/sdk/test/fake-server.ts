@@ -99,9 +99,23 @@ export class FakeServer {
     return `00000000-0000-4000-8000-${String(this.counter).padStart(12, "0")}`;
   }
 
-  private handle(method: string, url: URL, headers: Headers, body: Json): Response {
+  private async handle(method: string, url: URL, headers: Headers, body: Json): Promise<Response> {
     const path = url.pathname;
     let match: RegExpExecArray | null;
+    if (method === "POST" && /^\/v1\/(sessions|blueprints)\/[^/]+\/packages\/docs$/.test(path)) {
+      const check = new URL(url);
+      check.searchParams.set("name", "@submilli/jina");
+      const exists = await this.handle("GET", check, headers, {});
+      if (exists.status !== 200) return exists;
+      const results = [];
+      for (const name of body.names as string[]) {
+        const single = new URL(url);
+        single.searchParams.set("name", name);
+        const response = await this.handle("GET", single, headers, {});
+        results.push({ name, found: response.status === 200, text: await response.text() });
+      }
+      return json(200, { results });
+    }
     if (method === "POST" && path === "/v1/sessions") return this.open(body);
     if (method === "POST" && path === "/v1/execute") return this.executeOnce(body);
     if ((match = /^\/v1\/sessions\/([^/]+)\/execute$/.exec(path))) {

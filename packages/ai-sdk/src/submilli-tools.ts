@@ -102,7 +102,7 @@ export type SubmilliToolSet = {
   submilli__typescript__execute: Experimental_ToolCallerTool<Tool<{ code: string }, m.ExecuteOutput>>;
   submilli__typescript__last_run: Tool<Record<string, never>, JSONValue>;
   submilli__typescript__packages__search: Tool<{ query?: string }, JSONValue>;
-  submilli__typescript__packages__docs: Tool<{ name: string }, string>;
+  submilli__typescript__packages__docs: Tool<{ names: string[] }, string>;
   submilli__typescript__builtins__list: Tool<Record<string, never>, JSONValue>;
   submilli__typescript__builtins__docs: Tool<{ names: string[] }, JSONValue>;
 };
@@ -280,13 +280,13 @@ class Agent {
       }),
       [m.PACKAGES_DOCS]: tool({
         description: this.described[m.PACKAGES_DOCS]!,
-        inputSchema: jsonSchema<{ name: string }>({
+        inputSchema: jsonSchema<{ names: string[] }>({
           type: "object",
-          properties: { name: { type: "string", description: "Package name, e.g. `submilli:crypto`." } },
-          required: ["name"],
+          properties: { names: { type: "array", items: { type: "string" }, description: "Package names to read before writing a program." } },
+          required: ["names"],
           additionalProperties: false,
         }),
-        execute: async ({ name }, options) => this.packageDocs(name, options),
+        execute: async ({ names }, options) => this.packageDocs(names, options),
       }),
       [m.BUILTINS_LIST]: tool({
         description: this.described[m.BUILTINS_LIST]!,
@@ -586,12 +586,12 @@ class Agent {
     return (await this.inSession(options, (id) => this.client.sessions.searchPackages(id, query, signal))) as JSONValue;
   }
 
-  private async packageDocs(name: string, options: ToolExecutionOptions<unknown>): Promise<string> {
+  private async packageDocs(names: string[], options: ToolExecutionOptions<unknown>): Promise<string> {
     const signal = { signal: options.abortSignal };
     if (Object.keys(this.current).length === 0) {
-      return (await this.client.blueprints.packageDocs(this.options.blueprint, name, signal)).text;
+      return JSON.stringify({ results: await this.client.blueprints.packageDocsBatch(this.options.blueprint, names, signal) });
     }
-    return (await this.inSession(options, (id) => this.client.sessions.packageDocs(id, name, signal))).text;
+    return JSON.stringify({ results: await this.inSession(options, (id) => this.client.sessions.packageDocsBatch(id, names, signal)) });
   }
 
   private async inSession<T>(options: ToolExecutionOptions<unknown>, fetch: (sessionId: string) => Promise<T>): Promise<T> {
