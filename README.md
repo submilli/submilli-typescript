@@ -15,7 +15,6 @@ This repository holds the TypeScript packages for it:
 [Connect Vercel AI SDK](https://submilli.ai/docs/tutorials/connect-vercel-ai-sdk/) ·
 [Connect Mastra](https://submilli.ai/docs/tutorials/connect-mastra/) ·
 [Submilli runtime](https://github.com/submilli/submilli-runtime) ·
-[Discord](https://discord.gg/VphpukeGGj) ·
 [Website](https://submilli.ai)
 
 ## Let your coding agents do the work
@@ -72,7 +71,7 @@ const agent = new Agent({ id: "researcher", name: "Researcher", instructions, mo
 Submilli is young and moving quickly. Breaking changes are recorded in the
 [`@submilli/ai-sdk`](packages/ai-sdk/CHANGELOG.md), [`@submilli/mastra`](packages/mastra/CHANGELOG.md),
 and [`@submilli/sdk`](packages/sdk/CHANGELOG.md) changelogs. To talk with us, email
-[hello@submilli.ai](mailto:hello@submilli.ai) or join [Discord](https://discord.gg/VphpukeGGj).
+[hello@submilli.ai](mailto:hello@submilli.ai).
 
 ## Development
 
