@@ -14,9 +14,11 @@ import {
   UnknownRunError,
   UnknownSessionError,
   type BlueprintPrompt,
+  type ExecuteResult,
   type JSONSchema,
   type PendingCall,
   type RunState,
+  type SuspendedRun,
   type ToolDeclaration,
   type ToolResult,
 } from "@submilli/sdk";
@@ -515,18 +517,21 @@ class Agent {
     // The run belongs to the thread's session, whichever process suspended it.
     const session = await thread.stored();
     if (!session) throw new SubmilliError(`run ${payload.execution_id} waits in a session this thread no longer has`);
-    await thread.untrack(payload.execution_id);
-    let state: RunState;
+    let state: ExecuteResult | SuspendedRun;
     try {
-      state = await this.client.runs.retrieve(payload.execution_id, { signal: context.abortSignal });
+      state = await retrieveSettled(this.client, payload.execution_id, session.id, context.abortSignal);
     } catch (error) {
-      if (error instanceof UnknownRunError) return m.lostRunOutput(payload.execution_id, session.id, { toolCalls: [] });
-      if (error instanceof RunStateError) return m.runStateOutput(error, session.id, { toolCalls: [] });
+      if (error instanceof UnknownRunError) {
+        await thread.untrack(payload.execution_id);
+        return m.lostRunOutput(payload.execution_id, session.id, { toolCalls: [] });
+      }
+      if (error instanceof RunStateError) {
+        await thread.untrack(payload.execution_id);
+        return m.runStateOutput(error, session.id, { toolCalls: [] });
+      }
       throw error;
     }
-    if (state.sessionId !== session.id) {
-      throw new SubmilliError(`run ${payload.execution_id} does not belong to this thread's session`);
-    }
+    await thread.untrack(payload.execution_id);
     const waiting = state.status === "suspended" ? state.calls : [];
     if (!sameCalls(payload.calls, waiting)) return m.staleResumeOutput(payload, session.id, waiting);
     const approved = answer.approved === true;
@@ -555,14 +560,20 @@ class Agent {
     if (current === undefined) return;
     const abandoned = (session.waiting ?? []).filter((run) => run.agentRunId !== current);
     for (const { executionId } of abandoned) {
-      await thread.untrack(executionId);
-      let state: RunState;
+      let state: ExecuteResult | SuspendedRun;
       try {
-        state = await this.client.runs.retrieve(executionId, { signal: context.abortSignal });
-      } catch {
+        state = await retrieveSettled(this.client, executionId, session.id, context.abortSignal);
+      } catch (error) {
+        if (context.abortSignal?.aborted) throw error;
+        if (error instanceof UnknownRunError || error instanceof RunStateError) {
+          await thread.untrack(executionId);
+        }
         continue;
       }
-      if (state.status !== "suspended" || state.sessionId !== session.id) continue;
+      if (state.status !== "suspended") {
+        await thread.untrack(executionId);
+        continue;
+      }
       const refusal = "Not approved: the conversation moved on before a person decided on this call, so it did not run.";
       const refused = new Set(state.calls.map((call) => call.callId));
       const run: RunContext = { session, context, notice: undefined, records: [], decided: new Map() };
@@ -579,8 +590,12 @@ class Agent {
             }
           },
         });
+        await thread.untrack(executionId);
       } catch (error) {
         if (context.abortSignal?.aborted) throw error;
+        if (error instanceof UnknownRunError || error instanceof RunStateError) {
+          await thread.untrack(executionId);
+        }
       }
     }
   }
@@ -847,4 +862,37 @@ function sortKeys(value: unknown): unknown {
       .sort()
       .map((key) => [key, sortKeys((value as Record<string, unknown>)[key])]),
   );
+}
+
+async function retrieveSettled(
+  client: Submilli,
+  executionId: string,
+  sessionId: string,
+  signal: AbortSignal | undefined,
+): Promise<ExecuteResult | SuspendedRun> {
+  let delay = 100;
+  for (;;) {
+    const state = await client.runs.retrieve(executionId, { signal });
+    if (state.sessionId !== sessionId) {
+      throw new SubmilliError(`run ${executionId} does not belong to this thread's session`);
+    }
+    if (state.status === "finished" || state.status === "suspended") return state;
+    await sleep(delay, signal);
+    delay = Math.min(delay * 2, 2000);
+  }
+}
+
+function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }

@@ -123,6 +123,28 @@ describe("application tools", () => {
     assert.equal(result.result, "[7]");
   });
 
+  test("complete resets the poll backoff after resuming a suspended call", async () => {
+    const { fake, client, session } = await setup();
+    fake.programs.set("two", [
+      ["lookup", { id: 1 }],
+      ["lookup", { id: 2 }],
+    ]);
+    fake.runningPolls = 3;
+    const state = await client.sessions.execute(session, "two");
+    assert.equal(state.status, "queued");
+    const started = Date.now();
+    const result = await client.runs.complete(state, {
+      pollInterval: 1,
+      maxPollInterval: 500,
+      onToolCall: (call) => {
+        if (call.args.id === 1) fake.runningPolls = 1;
+        return toolResult.success(call.callId, call.args.id);
+      },
+    });
+    assert.ok(Date.now() - started < 400);
+    assert.equal(result.result, "[1,2]");
+  });
+
   test("resume needs at least one result", async () => {
     const { client } = await setup();
     await assert.rejects(client.runs.resume("r", []), RangeError);

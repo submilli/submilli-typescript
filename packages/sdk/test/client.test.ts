@@ -120,6 +120,48 @@ describe("retries", () => {
     assert.equal(state.status, "finished");
   });
 
+  test("idempotency_in_progress from an older server is retried with a key, while other idempotency 503s are not", async () => {
+    const { fake, client } = setup({ maxRetries: 2 });
+    const session = await client.sessions.create("research", { variables: { userId: "u" } });
+    fake.refuseNext.push(
+      [503, { error: "idempotency_in_progress", detail: "execution is still running", retry_after: 0 }],
+      [503, { error: "idempotency_in_progress", detail: "execution is still running", retry_after: 0 }],
+    );
+    const state = await client.sessions.execute(session.id, "x", { idempotencyKey: "k1" });
+    assert.equal(state.status, "finished");
+    assert.equal(fake.calls("POST", /\/execute$/).length, 3);
+
+    fake.refuseNext.push(
+      [503, { error: "idempotency_in_progress", detail: "still running", retry_after: 0 }],
+      [503, { error: "idempotency_in_progress", detail: "still running", retry_after: 0 }],
+      [503, { error: "idempotency_in_progress", detail: "still running", retry_after: 0 }],
+    );
+    await assert.rejects(client.sessions.execute(session.id, "x", { idempotencyKey: "k2" }), (error) => {
+      assert.ok(error instanceof IdempotencyError);
+      assert.equal(error.code, "idempotency_in_progress");
+      return true;
+    });
+
+    const before = fake.calls("POST", /\/execute$/).length;
+    fake.refuseNext.push([503, { error: "idempotency_unavailable", detail: "database locked", retry_after: 0 }]);
+    await assert.rejects(client.sessions.execute(session.id, "x", { idempotencyKey: "k3" }), (error) => {
+      assert.ok(error instanceof IdempotencyError);
+      assert.equal(error.code, "idempotency_unavailable");
+      return true;
+    });
+    assert.equal(fake.calls("POST", /\/execute$/).length, before + 1);
+  });
+
+  test("sessions.run polls a durable queued/running run until it finishes", async () => {
+    const { fake, client } = setup();
+    const session = await client.sessions.create("research", { variables: { userId: "u" } });
+    fake.runningPolls = 2;
+    const result = await client.sessions.run(session.id, "x", { idempotencyKey: "durable-1" });
+    assert.equal(result.status, "finished");
+    assert.equal(result.result, "ok");
+    assert.equal(fake.calls("GET", /^\/v1\/runs\//).length, 2);
+  });
+
   test("an aborted request is not retried", async () => {
     const { fake, client } = setup();
     fake.unavailable = 5;

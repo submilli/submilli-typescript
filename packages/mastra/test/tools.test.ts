@@ -211,6 +211,14 @@ describe("tools", () => {
     await agent.generate("go", { memory: THREAD });
     assert.match(String((shown(model).error as { message: string }).message), /Nothing ran/);
   });
+
+  test("a durable run that answers queued/running is polled until it finishes", async () => {
+    const { fake, model, agent } = app({}, [[execute("a", "toolu_durable")], "done"]);
+    fake.runningPolls = 2;
+    await agent.generate("go", { memory: THREAD });
+    assert.deepEqual(shown(model), { result: "ok", console: [], error: null, denied: false });
+    assert.equal(fake.calls("GET", /^\/v1\/runs\//).length, 2);
+  });
 });
 
 describe("ptc", () => {
@@ -398,6 +406,8 @@ describe("approvals", () => {
     );
     assert.equal(refunds.length, 0);
 
+    // Simulate a durable run still replaying back to its suspended call on resume.
+    fake.runningPolls = 1;
     const resumed = await agent.resumeGenerate(
       { approved: true },
       { runId: first.runId, toolCallId: suspended.toolCallId, memory: THREAD },
@@ -460,6 +470,48 @@ describe("approvals", () => {
     const [waiting] = fake.suspended.values();
     assert.match((waiting?.answers[0] as { error: { message: string } }).error.message, /moved on/);
     assert.equal(waiting?.finished?.status, "finished");
+    assert.equal(refunds.length, 0);
+    assert.equal(shown(model).result, "ok");
+  });
+
+  test("an aborted durable poll keeps the waiting run tracked so a later turn still refuses it", async () => {
+    refunds.length = 0;
+    const store = memorySessionStore();
+    const { fake, submilli, model, agent } = app(
+      { store, ptc: { refund } },
+      [[execute("refund")], [execute("next")], "moved on"],
+    );
+    fake.programs.set("refund", [["refund", { id: 2, amount: 40 }]]);
+    const first = await agent.generate("refund it", { memory: THREAD });
+    assert.equal(first.finishReason, "suspended");
+    assert.equal((await store.get("t1"))?.waiting?.length, 1);
+
+    // Simulate a durable run still replaying while a turn gets aborted mid-poll.
+    fake.runningPolls = 5;
+    const abort = new AbortController();
+    setTimeout(() => abort.abort(new Error("client disconnected")), 20);
+    const tools = await submilli.tools();
+    await assert.rejects(
+      tools.submilli__typescript__execute.execute!(
+        { code: "aborted" },
+        {
+          abortSignal: abort.signal,
+          runId: "aborted-agent-run",
+          requestContext: new RequestContext(),
+          agent: { threadId: "t1", resourceId: "u_ada" },
+        } as never,
+      ),
+      /client disconnected/,
+    );
+    assert.equal((await store.get("t1"))?.waiting?.length, 1);
+    assert.equal([...fake.suspended.values()][0]?.answers.length, 0);
+
+    fake.runningPolls = 0;
+    await agent.generate("never mind, do something else", { memory: THREAD });
+    const [waiting] = fake.suspended.values();
+    assert.match((waiting?.answers[0] as { error: { message: string } }).error.message, /moved on/);
+    assert.equal(waiting?.finished?.status, "finished");
+    assert.equal((await store.get("t1"))?.waiting, undefined);
     assert.equal(refunds.length, 0);
     assert.equal(shown(model).result, "ok");
   });

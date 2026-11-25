@@ -54,6 +54,7 @@ export class FakeServer {
   readonly sessions = new Map<string, Session>();
   readonly requests: Recorded[] = [];
   readonly suspended = new Map<string, Run>();
+  readonly completed = new Map<string, { id: string; sessionId: string; response: Json }>();
   requiredSecrets: string[] = [];
   readonly lostSecrets = new Set<string>();
   refuseNext: [number, Json][] = [];
@@ -64,6 +65,8 @@ export class FakeServer {
   openWarnings: string[] = [];
   // Answers 503 to this many requests before serving them.
   unavailable = 0;
+  // Answers `queued` / `running` to this many execute or run-retrieve calls before settling.
+  runningPolls = 0;
   private counter = 0;
 
   readonly fetch: typeof fetch = async (input, init) => {
@@ -114,8 +117,27 @@ export class FakeServer {
     if ((match = /^\/v1\/runs\/([^/]+)\/resume$/.exec(path))) return this.resume(match[1]!, body);
     if ((match = /^\/v1\/runs\/([^/]+)$/.exec(path))) {
       const run = this.suspended.get(match[1]!);
-      if (!run) return json(404, { error: "unknown_run", execution_id: match[1], message: "no such run" });
-      return json(200, this.state(run));
+      if (run) {
+        if (this.runningPolls > 0) {
+          this.runningPolls -= 1;
+          return json(200, { status: "running", execution_id: run.id, session_id: run.sessionId });
+        }
+        return json(200, this.state(run));
+      }
+      const done = this.completed.get(match[1]!);
+      if (done) {
+        if (this.runningPolls > 0) {
+          this.runningPolls -= 1;
+          return json(200, { status: "running", execution_id: done.id, session_id: done.sessionId });
+        }
+        return json(200, {
+          status: "completed",
+          execution_id: done.id,
+          session_id: done.sessionId,
+          response: done.response,
+        });
+      }
+      return json(404, { error: "unknown_run", execution_id: match[1], message: "no such run" });
     }
     if ((match = /^\/v1\/sessions\/([^/]+)\/last-run$/.exec(path))) {
       const session = this.sessions.get(match[1]!);
@@ -169,7 +191,11 @@ export class FakeServer {
       return json(409, { error: "session_requires_secrets", required: this.requiredSecrets, session_id: sessionId });
     }
     const refusal = this.refuseNext.shift();
-    if (refusal) return json(refusal[0], { ...refusal[1], session_id: sessionId });
+    if (refusal) {
+      const extra: Record<string, string> =
+        typeof refusal[1].retry_after === "number" ? { "retry-after": String(refusal[1].retry_after) } : {};
+      return json(refusal[0], { ...refusal[1], session_id: sessionId }, extra);
+    }
     const code = String(body.code);
     const recorded = key === null ? undefined : session.ledger.get(key);
     if (recorded) {
@@ -179,7 +205,15 @@ export class FakeServer {
       if (typeof recorded.recorded === "string") {
         const run = this.suspended.get(recorded.recorded);
         if (!run) return json(409, { error: "idempotency_incomplete", session_id: sessionId });
+        if (this.runningPolls > 0) {
+          this.runningPolls -= 1;
+          return json(200, { status: "running", execution_id: run.id, session_id: sessionId });
+        }
         return json(200, this.state(run));
+      }
+      if (this.runningPolls > 0) {
+        this.runningPolls -= 1;
+        return json(200, { status: "running", execution_id: recorded.recorded.execution_id, session_id: sessionId });
       }
       return json(200, recorded.recorded);
     }
@@ -189,11 +223,21 @@ export class FakeServer {
       const run: Run = { id: this.id(), sessionId, calls: [...calls], answers: [], finished: undefined };
       this.suspended.set(run.id, run);
       if (key !== null) session.ledger.set(key, { code, recorded: run.id });
+      if (this.runningPolls > 0) {
+        this.runningPolls -= 1;
+        return json(200, { status: "queued", execution_id: run.id, session_id: sessionId });
+      }
       return json(200, this.state(run));
     }
-    const result: Json = { execution_id: this.id(), session_id: sessionId, ...this.outcome };
+    const id = this.id();
+    const result: Json = { execution_id: id, session_id: sessionId, ...this.outcome };
+    this.completed.set(id, { id, sessionId, response: result });
     if (key !== null) session.ledger.set(key, { code, recorded: result });
     session.last = { result: result.result, console: result.console, error: result.error };
+    if (this.runningPolls > 0) {
+      this.runningPolls -= 1;
+      return json(200, { status: "queued", execution_id: id, session_id: sessionId });
+    }
     return json(200, result);
   }
 
@@ -310,6 +354,9 @@ export class FakeServer {
   }
 }
 
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+function json(status: number, body: unknown, extraHeaders: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json", ...extraHeaders },
+  });
 }

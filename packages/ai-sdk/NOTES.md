@@ -43,8 +43,9 @@ It is a port of the Python `submilli` SDK, with the same names in camelCase.
 - **Idempotency keys** are the id itself when it is printable ASCII of at most 120 bytes,
   otherwise its sha256 hex. `idempotencyKey` is async because WebCrypto is.
 - **Retries** only for requests that are safe to repeat, on connection errors and 502/503/504,
-  honoring `Retry-After`. The default timeout is 330 s, because an execute may wait 300 s for
-  an earlier attempt with the same key. Every method takes an `AbortSignal`.
+  honoring `Retry-After`. The default timeout is 330 s, leaving room for long-running programs
+  and in-flight idempotent retries waiting for an active run to finish. Every method takes an
+  `AbortSignal`.
 - **`inlineRefs`** inlines local `$ref`s (`#/$defs`, `#/definitions`), because the server's
   mapper does not resolve them. A recursive reference, and `#`, become `{}`.
 

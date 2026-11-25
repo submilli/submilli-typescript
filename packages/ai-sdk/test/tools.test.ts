@@ -185,6 +185,17 @@ describe("sessions", () => {
     assert.equal(fake.totalRuns(), 1);
   });
 
+  test("a durable run that answers queued/running is polled until it finishes", async () => {
+    const { fake, client } = setup();
+    fake.runningPolls = 2;
+    const { model } = await run(
+      { client, blueprint: "research", variables: { userId: "u" } },
+      [[execute("function main() {}", "toolu_durable")], "done"],
+    );
+    assert.deepEqual(model.toolResults()[0], { result: "ok", console: [], error: null, denied: false });
+    assert.equal(fake.calls("GET", /^\/v1\/runs\//).length, 2);
+  });
+
   test("an app error is the AI SDK's tool error", async () => {
     const { client } = setup();
     const { model } = await run({ client, blueprint: "research" }, [[execute("a")], "done"]);
@@ -419,6 +430,8 @@ describe("approvals", () => {
       ...first.messages,
       { role: "tool", content: [{ type: "tool-approval-response", approvalId: approval.approvalId, approved: true }] },
     ];
+    // Simulate a durable run still replaying back to its suspended call on resume.
+    fake.runningPolls = 1;
     const gatedSpy = tool({
       ...refund,
       needsApproval: true,

@@ -22,8 +22,10 @@ import {
   UnknownRunError,
   UnknownSessionError,
   type BlueprintPrompt,
+  type ExecuteResult,
   type PendingCall,
   type RunState,
+  type SuspendedRun,
   type ToolDeclaration,
   type ToolResult,
 } from "@submilli/sdk";
@@ -495,16 +497,13 @@ class Agent {
     const session = await this.conversation.stored();
     if (!session) throw new SubmilliError(`run ${input.execution_id} waits in a session this conversation no longer has`);
     const catalog = await this.catalog(this.current);
-    let state: RunState;
+    let state: ExecuteResult | SuspendedRun;
     try {
-      state = await this.client.runs.retrieve(input.execution_id, { signal: options.abortSignal });
+      state = await retrieveSettled(this.client, input.execution_id, session.id, options.abortSignal);
     } catch (error) {
       if (error instanceof UnknownRunError) return m.lostRunOutput(input.execution_id, session.id, { toolCalls: [] });
       if (error instanceof RunStateError) return m.runStateOutput(error, session.id, { toolCalls: [] });
       throw error;
-    }
-    if (state.sessionId !== session.id) {
-      throw new SubmilliError(`run ${input.execution_id} does not belong to this conversation's session`);
     }
     const waiting = state.status === "suspended" ? state.calls : [];
     if (!sameCalls(input.calls, waiting)) return m.staleResumeOutput(input, session.id, waiting);
@@ -529,13 +528,14 @@ class Agent {
   ): Promise<void> {
     for (const { executionId, reason } of waitingRuns(options.messages)) {
       if (refusedOnly && reason === undefined) continue;
-      let state: RunState;
+      let state: ExecuteResult | SuspendedRun;
       try {
-        state = await this.client.runs.retrieve(executionId, { signal: options.abortSignal });
-      } catch {
+        state = await retrieveSettled(this.client, executionId, session.id, options.abortSignal);
+      } catch (error) {
+        if (options.abortSignal?.aborted) throw error;
         continue;
       }
-      if (state.status !== "suspended" || state.sessionId !== session.id) continue;
+      if (state.status !== "suspended") continue;
       const refusal =
         reason ?? "Not approved: the conversation moved on before a person approved this call, so it did not run.";
       const refused = new Set(state.calls.map((call) => call.callId));
@@ -824,4 +824,37 @@ function waitingRuns(messages: readonly ModelMessage[]): { executionId: string; 
     }
   }
   return [...waiting].map(([executionId, reason]) => ({ executionId, reason }));
+}
+
+async function retrieveSettled(
+  client: Submilli,
+  executionId: string,
+  sessionId: string,
+  signal: AbortSignal | undefined,
+): Promise<ExecuteResult | SuspendedRun> {
+  let delay = 100;
+  for (;;) {
+    const state = await client.runs.retrieve(executionId, { signal });
+    if (state.sessionId !== sessionId) {
+      throw new SubmilliError(`run ${executionId} does not belong to this conversation's session`);
+    }
+    if (state.status === "finished" || state.status === "suspended") return state;
+    await sleep(delay, signal);
+    delay = Math.min(delay * 2, 2000);
+  }
+}
+
+function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
