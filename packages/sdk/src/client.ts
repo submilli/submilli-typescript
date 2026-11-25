@@ -30,8 +30,8 @@ import {
 import { VERSION } from "./version.ts";
 
 export const DEFAULT_BASE_URL = "http://127.0.0.1:8128";
-// An execute may wait up to 300 seconds on the server for an earlier attempt
-// with the same idempotency key; leave room for that.
+// Programs and in-flight idempotent retries wait on the server until the run
+// settles; leave room for long-running executions.
 const DEFAULT_TIMEOUT_MS = 330_000;
 const DEFAULT_MAX_RETRIES = 2;
 // The longest `Idempotency-Key` the server accepts, in bytes.
@@ -62,7 +62,7 @@ export interface SubmilliOptions {
    * `--allow-unauthenticated` needs none.
    */
   token?: string;
-  /** Milliseconds per request. Default 330 000: an execute may wait 300 s on an earlier attempt. */
+  /** Milliseconds per request. Default 330 000, leaving room for long-running executions. */
   timeout?: number;
   /**
    * Further attempts after a connection failure or a 502, 503 or 504, for
@@ -412,8 +412,9 @@ export class Runs {
     } & RequestOptions = {},
   ): Promise<ExecuteResult> {
     const { onToolCall, signal } = options;
+    const initialDelay = options.pollInterval ?? 100;
     const maxPollInterval = options.maxPollInterval ?? 2000;
-    let delay = options.pollInterval ?? 100;
+    let delay = initialDelay;
     // Recovery can expose an unanswered call again if a resume was delivered
     // but not committed. Resend its answer without repeating the host effect.
     const answered = new Map<string, { call: PendingCall; result: ToolResult }>();
@@ -454,6 +455,7 @@ export class Runs {
         if (!(error instanceof RunNotSuspendedError || error instanceof UnknownCallError)) throw error;
         state = await this.retrieve(state.executionId, { signal });
       }
+      delay = initialDelay;
     }
     return state;
   }
@@ -504,9 +506,10 @@ export class Blueprints {
 
 function shouldRetry(response: Response): boolean {
   if (![502, 503, 504].includes(response.status)) return false;
-  // An idempotency refusal is the server's answer, not a transient failure.
+  // An idempotency refusal is the server's answer, not a transient failure,
+  // except `idempotency_in_progress` from an older server while the run is still working.
   const code = isRecord(response.body) ? response.body.error : undefined;
-  return typeof code !== "string" || !IDEMPOTENCY_CODES.has(code);
+  return typeof code !== "string" || code === "idempotency_in_progress" || !IDEMPOTENCY_CODES.has(code);
 }
 
 function retryDelay(attempt: number, response: Response | undefined): number {

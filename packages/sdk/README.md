@@ -205,9 +205,9 @@ concerns, when there is one.
 A connection failure, or a 502, 503, or 504, is retried up to `maxRetries` times (default 2),
 with backoff and the server's `Retry-After`, but only for requests that are safe to repeat:
 reads, deletes, rebinds, resumes, and executes that carry an idempotency key. An execute without
-a key and `sessions.create` are never retried. The default timeout is 330 seconds, because an
-execute may wait up to 300 seconds for an earlier attempt with the same key. Every method takes
-a `signal`.
+a key and `sessions.create` are never retried. The default timeout is 330 seconds, leaving room
+for long-running programs and in-flight idempotent retries waiting for an active run to finish.
+Every method takes a `signal`.
 
 ```ts
 const client = new Submilli({ timeout: 60_000, maxRetries: 0, fetch: myFetch });

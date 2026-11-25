@@ -114,8 +114,9 @@ session, and `close({ threadId, memory })`, which ends it.
 - **Secrets** are sent when a session opens and are never stored. End the session before using
   rotated secrets.
 - **Idempotency.** Each execute sends an `Idempotency-Key` derived from Mastra's `toolCallId`. A
-  repeated call replays the recorded result. Conflicts and incomplete, in-progress, or
-  unavailable replays come back to the model as errors, without running the program again.
+  repeated call waits for an in-flight run or replays the recorded result. Conflicts and
+  incomplete or unavailable replays come back to the model as errors, without running the
+  program again.
 - **Ended sessions.** When the server no longer knows a session, a new one is opened, and the
   model is told that files outside persistent volumes are gone. If a restarted server asks for
   the session's secrets, they are rebound once.
