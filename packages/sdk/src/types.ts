@@ -147,6 +147,11 @@ export interface PackageDocs {
   text: string;
 }
 
+/** One entry in a batch docs response, in request order. */
+export interface PackageDocsEntry extends PackageDocs {
+  name: string;
+}
+
 /** `GET /v1/blueprints/{name}/prompt`: what the server writes for a model about this Blueprint. */
 export interface BlueprintPrompt {
   name: string;

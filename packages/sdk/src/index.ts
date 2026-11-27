@@ -49,6 +49,7 @@ export {
   type JSONSchema,
   type LastRun,
   type PackageDocs,
+  type PackageDocsEntry,
   type PendingCall,
   type RunError,
   type RunningRun,
